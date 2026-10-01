@@ -9,7 +9,7 @@ $status_filter = sanitize($_GET['status'] ?? 'all');
 $where = ["o.user_id = ?"];
 $params = [$user['id']];
 
-if (in_array($status_filter, ['pending', 'processing', 'completed', 'cancelled'])) {
+if (in_array($status_filter, ['pending', 'processing', 'completed', 'failed', 'cancelled', 'refunded'])) {
     $where[] = "o.order_status = ?";
     $params[] = $status_filter;
 }
@@ -60,126 +60,146 @@ require_once __DIR__ . '/includes/header.php';
            class="px-4 py-2 rounded-xl text-xs font-semibold transition-all <?php echo $status_filter === 'completed' ? 'bg-emerald-600 text-white shadow-red-subtle' : 'bg-gaming-850 text-zinc-400 hover:text-white border border-gaming-border'; ?>">
             Completed
         </a>
-        <a href="/orders.php?status=cancelled" 
-           class="px-4 py-2 rounded-xl text-xs font-semibold transition-all <?php echo $status_filter === 'cancelled' ? 'bg-zinc-700 text-white shadow-red-subtle' : 'bg-gaming-850 text-zinc-400 hover:text-white border border-gaming-border'; ?>">
-            Cancelled
+        <a href="/orders.php?status=failed" 
+           class="px-4 py-2 rounded-xl text-xs font-semibold transition-all <?php echo $status_filter === 'failed' ? 'bg-red-600 text-white shadow-red-subtle' : 'bg-gaming-850 text-zinc-400 hover:text-white border border-gaming-border'; ?>">
+            Failed
+        </a>
+        <a href="/orders.php?status=refunded" 
+           class="px-4 py-2 rounded-xl text-xs font-semibold transition-all <?php echo $status_filter === 'refunded' ? 'bg-purple-600 text-white shadow-red-subtle' : 'bg-gaming-850 text-zinc-400 hover:text-white border border-gaming-border'; ?>">
+            Refunded
         </a>
     </div>
 
-    <?php if (!empty($orders)): ?>
-        <!-- Desktop Table View -->
-        <div class="hidden md:block bg-gaming-850 border border-gaming-border rounded-2xl overflow-hidden shadow-2xl">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-gaming-900 border-b border-gaming-border text-xs text-zinc-400 uppercase font-gaming">
-                        <th class="py-4 px-4">Order ID</th>
-                        <th class="py-4 px-4">Product / Item</th>
-                        <th class="py-4 px-4">Player UID</th>
-                        <th class="py-4 px-4">Amount</th>
-                        <th class="py-4 px-4">Status</th>
-                        <th class="py-4 px-4">Date</th>
-                        <th class="py-4 px-4 text-right">Action</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gaming-border/60 text-xs">
-                    <?php foreach ($orders as $ord): 
-                        $status_badge = match($ord['order_status']) {
-                            'completed' => 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40',
-                            'processing' => 'bg-blue-950/80 text-blue-400 border-blue-800/40',
-                            'cancelled' => 'bg-red-950/80 text-red-400 border-red-800/40',
-                            default => 'bg-amber-950/80 text-amber-400 border-amber-800/40'
-                        };
-                    ?>
-                        <tr class="hover:bg-gaming-800/40 transition-colors">
-                            <td class="py-4 px-4 font-mono font-bold text-white"><?php echo e($ord['order_number']); ?></td>
-                            <td class="py-4 px-4">
-                                <div class="font-bold text-white"><?php echo e($ord['product_name']); ?></div>
-                                <?php if ($ord['diamonds_amount'] > 0): ?>
-                                    <div class="text-[11px] text-red-400 font-semibold"><?php echo $ord['diamonds_amount']; ?> Diamonds</div>
-                                <?php endif; ?>
-                            </td>
-                            <td class="py-4 px-4 font-mono text-zinc-300">
-                                <div><?php echo e($ord['ff_uid']); ?></div>
-                                <div class="text-[10px] text-zinc-500"><?php echo e($ord['ff_region']); ?></div>
-                            </td>
-                            <td class="py-4 px-4 font-gaming font-bold text-white text-sm"><?php echo format_currency($ord['total_amount']); ?></td>
-                            <td class="py-4 px-4">
-                                <span class="inline-block px-2.5 py-1 rounded text-[10px] font-bold uppercase border <?php echo $status_badge; ?>">
-                                    <?php echo e($ord['order_status']); ?>
-                                </span>
-                            </td>
-                            <td class="py-4 px-4 text-zinc-400"><?php echo date('M d, Y H:i', strtotime($ord['created_at'])); ?></td>
-                            <td class="py-4 px-4 text-right">
-                                <a href="/order-details.php?id=<?php echo $ord['id']; ?>" 
-                                   class="px-3 py-1.5 rounded-lg bg-gaming-800 hover:bg-gaming-750 text-red-400 hover:text-red-300 font-semibold border border-gaming-border transition-colors">
-                                    View Details
-                                </a>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+    <!-- Orders Content -->
+    <?php if (empty($orders)): ?>
+        <div class="text-center py-20 rounded-2xl bg-gaming-900 border border-gaming-border p-8">
+            <div class="w-16 h-16 mx-auto rounded-full bg-red-950/60 border border-red-800/40 flex items-center justify-center text-red-500 mb-4">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+            </div>
+            <h3 class="font-gaming text-xl font-bold text-white mb-2">No Orders Found</h3>
+            <p class="text-xs text-zinc-400 max-w-sm mx-auto mb-6">You haven't placed any diamond top-up orders with this status yet.</p>
+            <a href="/products.php" class="btn-gaming-red text-white text-xs font-gaming font-bold px-6 py-2.5 rounded-xl shadow-red-subtle">
+                Browse Diamonds & Top-Up
+            </a>
         </div>
-
-        <!-- Mobile Card View (Strict Requirement: cards rather than forcing a large table on mobile) -->
-        <div class="md:hidden space-y-4">
+    <?php else: ?>
+        <!-- Mobile Cards Layout (Requirement 2 & 10: responsive card layout for mobile) -->
+        <div class="grid grid-cols-1 gap-4 md:hidden">
             <?php foreach ($orders as $ord): 
-                $status_badge = match($ord['order_status']) {
-                    'completed' => 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40',
-                    'processing' => 'bg-blue-950/80 text-blue-400 border-blue-800/40',
-                    'cancelled' => 'bg-red-950/80 text-red-400 border-red-800/40',
-                    default => 'bg-amber-950/80 text-amber-400 border-amber-800/40'
+                $badge = match($ord['order_status']) {
+                    'completed' => 'bg-emerald-950 text-emerald-400 border-emerald-800',
+                    'processing' => 'bg-blue-950 text-blue-400 border-blue-800',
+                    'failed' => 'bg-red-950 text-red-400 border-red-800',
+                    'cancelled' => 'bg-zinc-800 text-zinc-400 border-zinc-700',
+                    'refunded' => 'bg-purple-950 text-purple-400 border-purple-800',
+                    default => 'bg-amber-950 text-amber-400 border-amber-800'
                 };
             ?>
-                <div class="bg-gaming-850 border border-gaming-border rounded-xl p-4 space-y-3">
-                    <div class="flex items-center justify-between pb-2 border-b border-gaming-border/60">
-                        <span class="font-mono text-xs font-bold text-white"><?php echo e($ord['order_number']); ?></span>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase border <?php echo $status_badge; ?>">
+                <div class="p-5 rounded-2xl bg-gaming-850 border border-gaming-border space-y-4">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <span class="text-[11px] font-mono text-zinc-400 block"><?php echo date('M d, Y h:i A', strtotime($ord['created_at'])); ?></span>
+                            <span class="font-mono text-sm font-bold text-white"><?php echo e($ord['order_number']); ?></span>
+                        </div>
+                        <span class="px-2.5 py-1 rounded text-[11px] font-bold uppercase border <?php echo $badge; ?>">
                             <?php echo e($ord['order_status']); ?>
                         </span>
                     </div>
 
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h4 class="font-gaming font-bold text-sm text-white"><?php echo e($ord['product_name']); ?></h4>
-                            <?php if ($ord['diamonds_amount'] > 0): ?>
-                                <span class="text-xs text-red-400 font-semibold"><?php echo $ord['diamonds_amount']; ?> Diamonds</span>
-                            <?php endif; ?>
+                    <div class="p-3 rounded-xl bg-gaming-900 border border-gaming-border space-y-1 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-zinc-400">Item:</span>
+                            <span class="font-bold text-white"><?php echo e($ord['product_name']); ?></span>
                         </div>
-                        <span class="font-gaming text-base font-extrabold text-white"><?php echo format_currency($ord['total_amount']); ?></span>
+                        <?php if (!empty($ord['variant_name'])): ?>
+                            <div class="flex justify-between">
+                                <span class="text-zinc-400">Variant:</span>
+                                <span class="text-zinc-200"><?php echo e($ord['variant_name']); ?></span>
+                            </div>
+                        <?php endif; ?>
+                        <div class="flex justify-between">
+                            <span class="text-zinc-400">Player UID:</span>
+                            <span class="font-mono text-red-400"><?php echo e($ord['ff_uid']); ?></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-zinc-400">Amount:</span>
+                            <span class="font-bold text-white"><?php echo format_currency($ord['total_amount']); ?></span>
+                        </div>
                     </div>
 
-                    <div class="text-xs text-zinc-400 space-y-1 bg-gaming-900/60 p-2.5 rounded-lg border border-gaming-border/40">
-                        <div class="flex justify-between">
-                            <span>UID:</span>
-                            <span class="font-mono font-bold text-white"><?php echo e($ord['ff_uid']); ?> (<?php echo e($ord['ff_region']); ?>)</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span>Date:</span>
-                            <span><?php echo date('M d, Y h:i A', strtotime($ord['created_at'])); ?></span>
-                        </div>
-                    </div>
-
-                    <div class="pt-1">
-                        <a href="/order-details.php?id=<?php echo $ord['id']; ?>" 
-                           class="w-full block text-center py-2 rounded-lg bg-gaming-800 text-xs font-semibold text-red-400 border border-gaming-border hover:bg-gaming-750">
-                            View Order Details &rarr;
+                    <div class="flex items-center gap-2">
+                        <a href="/order-details.php?id=<?php echo $ord['id']; ?>" class="flex-1 text-center py-2 rounded-xl bg-gaming-800 hover:bg-gaming-750 text-xs font-semibold text-white border border-gaming-border">
+                            Order Details
+                        </a>
+                        <a href="/invoice.php?id=<?php echo $ord['id']; ?>" class="px-3 py-2 rounded-xl bg-red-950/60 hover:bg-red-900 text-xs font-semibold text-red-300 border border-red-800/40">
+                            Invoice
                         </a>
                     </div>
                 </div>
             <?php endforeach; ?>
         </div>
 
-    <?php else: ?>
-        <div class="p-16 text-center rounded-2xl bg-gaming-850 border border-gaming-border space-y-3">
-            <svg class="w-12 h-12 text-zinc-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
-            </svg>
-            <h3 class="font-gaming text-lg font-bold text-white">No orders found</h3>
-            <p class="text-xs text-zinc-400">You don't have any orders matching the selected filter.</p>
-            <a href="/products.php" class="inline-block mt-2 btn-gaming-red text-white text-xs font-bold font-gaming px-5 py-2.5 rounded-xl shadow-red-subtle">
-                Browse Diamonds & Passes &rarr;
-            </a>
+        <!-- Desktop Table Layout -->
+        <div class="hidden md:block overflow-hidden rounded-2xl bg-gaming-850 border border-gaming-border">
+            <table class="w-full text-left text-xs">
+                <thead>
+                    <tr class="border-b border-gaming-border bg-gaming-900 text-zinc-400 uppercase font-mono text-[10px]">
+                        <th class="py-4 px-6">Order ID & Date</th>
+                        <th class="py-4 px-4">Item & Variant</th>
+                        <th class="py-4 px-4">Free Fire UID</th>
+                        <th class="py-4 px-4">Amount</th>
+                        <th class="py-4 px-4">Status</th>
+                        <th class="py-4 px-6 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gaming-border/60">
+                    <?php foreach ($orders as $ord): 
+                        $badge = match($ord['order_status']) {
+                            'completed' => 'bg-emerald-950 text-emerald-400 border-emerald-800',
+                            'processing' => 'bg-blue-950 text-blue-400 border-blue-800',
+                            'failed' => 'bg-red-950 text-red-400 border-red-800',
+                            'cancelled' => 'bg-zinc-800 text-zinc-400 border-zinc-700',
+                            'refunded' => 'bg-purple-950 text-purple-400 border-purple-800',
+                            default => 'bg-amber-950 text-amber-400 border-amber-800'
+                        };
+                    ?>
+                        <tr class="hover:bg-gaming-800/50 transition-colors">
+                            <td class="py-4 px-6">
+                                <span class="font-mono font-bold text-white block"><?php echo e($ord['order_number']); ?></span>
+                                <span class="text-[11px] text-zinc-400"><?php echo date('M d, Y h:i A', strtotime($ord['created_at'])); ?></span>
+                            </td>
+                            <td class="py-4 px-4">
+                                <span class="font-semibold text-white block"><?php echo e($ord['product_name']); ?></span>
+                                <?php if (!empty($ord['variant_name'])): ?>
+                                    <span class="text-[10px] text-zinc-400"><?php echo e($ord['variant_name']); ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="py-4 px-4">
+                                <span class="font-mono text-red-400 font-bold"><?php echo e($ord['ff_uid']); ?></span>
+                                <?php if (!empty($ord['ff_nickname'])): ?>
+                                    <span class="text-[10px] text-zinc-400 block"><?php echo e($ord['ff_nickname']); ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="py-4 px-4 font-mono font-bold text-white">
+                                <?php echo format_currency($ord['total_amount']); ?>
+                            </td>
+                            <td class="py-4 px-4">
+                                <span class="inline-block px-2.5 py-0.5 rounded text-[11px] font-bold uppercase border <?php echo $badge; ?>">
+                                    <?php echo e($ord['order_status']); ?>
+                                </span>
+                            </td>
+                            <td class="py-4 px-6 text-right space-x-2">
+                                <a href="/invoice.php?id=<?php echo $ord['id']; ?>" class="px-2.5 py-1.5 rounded-lg bg-gaming-800 hover:bg-gaming-750 text-zinc-300 hover:text-white border border-gaming-border">
+                                    Invoice
+                                </a>
+                                <a href="/order-details.php?id=<?php echo $ord['id']; ?>" class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold shadow-red-subtle">
+                                    Details &rarr;
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     <?php endif; ?>
 </div>

@@ -3,6 +3,12 @@
 $uri = urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
 $file = __DIR__ . $uri;
 
+// Route root, index.html, index to index.php
+if ($uri === '/' || $uri === '' || $uri === '/index.html' || $uri === '/index' || $uri === '/index.php') {
+    require __DIR__ . '/index.php';
+    exit;
+}
+
 // Serve existing static file (css, js, images, svg, etc.)
 if ($uri !== '/' && file_exists($file) && !is_dir($file)) {
     return false;

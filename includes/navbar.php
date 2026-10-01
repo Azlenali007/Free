@@ -2,6 +2,7 @@
 $current_page = basename($_SERVER['PHP_SELF'] ?? '');
 $user = current_user();
 $site_name = get_setting('site_name', 'FireZone Store');
+$unread_notifs = $user ? get_unread_notifications_count($user['id']) : 0;
 ?>
 <header class="sticky top-0 z-50 bg-gaming-900/90 backdrop-blur-md border-b border-gaming-border">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -32,6 +33,9 @@ $site_name = get_setting('site_name', 'FireZone Store');
                 <a href="/products.php" class="px-3.5 py-2 rounded-lg text-sm font-medium transition-colors <?php echo $current_page === 'products.php' || $current_page === 'product.php' ? 'text-red-400 bg-red-950/40 border border-red-900/30' : 'text-zinc-300 hover:text-white hover:bg-gaming-800'; ?>">
                     Products
                 </a>
+                <a href="/reseller.php" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors <?php echo $current_page === 'reseller.php' ? 'text-red-400 bg-red-950/40 border border-red-900/30' : 'text-zinc-300 hover:text-white hover:bg-gaming-800'; ?> flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Reseller B2B
+                </a>
 
                 <?php if ($user): ?>
                     <a href="/dashboard.php" class="px-3.5 py-2 rounded-lg text-sm font-medium transition-colors <?php echo $current_page === 'dashboard.php' ? 'text-red-400 bg-red-950/40 border border-red-900/30' : 'text-zinc-300 hover:text-white hover:bg-gaming-800'; ?>">
@@ -46,9 +50,21 @@ $site_name = get_setting('site_name', 'FireZone Store');
                 <?php endif; ?>
             </nav>
 
-            <!-- Right Actions (User Profile / Wallet / Auth) -->
+            <!-- Right Actions (User Profile / Wallet / Notifs / Auth) -->
             <div class="hidden md:flex items-center gap-3">
                 <?php if ($user): ?>
+                    <!-- Notification Bell -->
+                    <a href="/notifications.php" class="relative p-2 rounded-lg bg-gaming-800 border border-gaming-border hover:border-red-600/40 text-zinc-300 hover:text-white transition-all" title="Notifications">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                        </svg>
+                        <?php if ($unread_notifs > 0): ?>
+                            <span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-[10px] font-bold text-white flex items-center justify-center animate-pulse">
+                                <?php echo min(9, $unread_notifs); ?>
+                            </span>
+                        <?php endif; ?>
+                    </a>
+
                     <!-- Wallet Badge -->
                     <a href="/wallet.php" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gaming-800 border border-gaming-border hover:border-red-600/50 hover:bg-gaming-750 transition-all group">
                         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -70,7 +86,7 @@ $site_name = get_setting('site_name', 'FireZone Store');
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                             </svg>
                         </button>
-                        <div id="userMenuDropdown" class="hidden absolute right-0 mt-2 w-48 rounded-xl bg-gaming-850 border border-gaming-border shadow-2xl py-1 z-50 animate-fade-in">
+                        <div id="userMenuDropdown" class="hidden absolute right-0 mt-2 w-52 rounded-xl bg-gaming-850 border border-gaming-border shadow-2xl py-1 z-50 animate-fade-in">
                             <div class="px-4 py-2 border-b border-gaming-border">
                                 <p class="text-xs text-zinc-400">Signed in as</p>
                                 <p class="text-sm font-semibold text-white truncate"><?php echo e($user['name']); ?></p>
@@ -79,8 +95,14 @@ $site_name = get_setting('site_name', 'FireZone Store');
                                 <?php endif; ?>
                             </div>
                             <a href="/profile.php" class="block px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-gaming-800">Profile & Player UID</a>
-                            <a href="/wallet.php" class="block px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-gaming-800">Wallet & Deposits</a>
+                            <a href="/wallet.php" class="block px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-gaming-800">Wallet & Add Money</a>
                             <a href="/orders.php" class="block px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-gaming-800">Order History</a>
+                            <a href="/referral.php" class="block px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-gaming-800 flex items-center justify-between">
+                                <span>Refer & Earn</span>
+                                <span class="text-[10px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded font-mono">Bonus</span>
+                            </a>
+                            <a href="/reseller.php" class="block px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-gaming-800">Reseller Dashboard</a>
+                            <a href="/notifications.php" class="block px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-gaming-800">Notifications</a>
                             <div class="border-t border-gaming-border my-1"></div>
                             <a href="/logout.php" class="block px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-950/40">Logout</a>
                         </div>
@@ -102,92 +124,124 @@ $site_name = get_setting('site_name', 'FireZone Store');
             </div>
 
             <!-- Mobile Hamburger Button -->
-            <div class="flex items-center gap-2 md:hidden">
+            <div class="flex md:hidden items-center gap-2">
                 <?php if ($user): ?>
-                    <a href="/wallet.php" class="flex items-center gap-1 px-2 py-1 rounded bg-gaming-800 border border-gaming-border text-xs font-bold text-emerald-400 font-gaming">
-                        <?php echo format_currency($user['wallet_balance']); ?>
+                    <a href="/notifications.php" class="relative p-1.5 rounded-lg bg-gaming-800 border border-gaming-border text-zinc-300">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                        </svg>
+                        <?php if ($unread_notifs > 0): ?>
+                            <span class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-600 text-[9px] font-bold text-white flex items-center justify-center">
+                                <?php echo min(9, $unread_notifs); ?>
+                            </span>
+                        <?php endif; ?>
+                    </a>
+                    <a href="/wallet.php" class="flex items-center gap-1 px-2.5 py-1 rounded bg-gaming-800 border border-gaming-border text-xs font-bold text-emerald-400">
+                        <span><?php echo format_currency($user['wallet_balance']); ?></span>
                     </a>
                 <?php endif; ?>
-                <button type="button" id="mobileMenuBtn" aria-label="Toggle navigation menu" class="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-gaming-800 focus:outline-none">
+                <button type="button" id="mobileMenuBtn" class="p-2 rounded-lg bg-gaming-800 border border-gaming-border text-zinc-300 hover:text-white focus:outline-none">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path id="mobileMenuIcon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
                     </svg>
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Mobile Drawer / Menu -->
-    <div id="mobileMenu" class="hidden md:hidden border-t border-gaming-border bg-gaming-900 px-4 pt-3 pb-6 space-y-2">
-        <a href="/index.php" class="block px-3 py-2.5 rounded-lg text-base font-medium <?php echo $current_page === 'index.php' ? 'text-red-400 bg-red-950/40 font-semibold' : 'text-zinc-300 hover:bg-gaming-800'; ?>">
+    <!-- Mobile Drawer Navigation -->
+    <div id="mobileDrawer" class="hidden md:hidden bg-gaming-900 border-b border-gaming-border px-4 pt-2 pb-6 space-y-2">
+        <?php if ($user): ?>
+            <div class="p-3 mb-2 rounded-xl bg-gaming-850 border border-gaming-border flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-zinc-400">Logged in as</p>
+                    <p class="text-sm font-bold text-white"><?php echo e($user['username']); ?></p>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] text-zinc-400">Wallet</p>
+                    <p class="text-sm font-gaming font-bold text-emerald-400"><?php echo format_currency($user['wallet_balance']); ?></p>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <a href="/index.php" class="block px-3 py-2 rounded-lg text-base font-medium <?php echo $current_page === 'index.php' ? 'text-red-400 bg-red-950/40' : 'text-zinc-300 hover:text-white hover:bg-gaming-800'; ?>">
             Home
         </a>
-        <a href="/products.php" class="block px-3 py-2.5 rounded-lg text-base font-medium <?php echo $current_page === 'products.php' ? 'text-red-400 bg-red-950/40 font-semibold' : 'text-zinc-300 hover:bg-gaming-800'; ?>">
+        <a href="/products.php" class="block px-3 py-2 rounded-lg text-base font-medium <?php echo $current_page === 'products.php' ? 'text-red-400 bg-red-950/40' : 'text-zinc-300 hover:text-white hover:bg-gaming-800'; ?>">
             Products
+        </a>
+        <a href="/reseller.php" class="block px-3 py-2 rounded-lg text-base font-medium <?php echo $current_page === 'reseller.php' ? 'text-red-400 bg-red-950/40' : 'text-zinc-300 hover:text-white hover:bg-gaming-800'; ?>">
+            Reseller Portal
         </a>
 
         <?php if ($user): ?>
-            <a href="/dashboard.php" class="block px-3 py-2.5 rounded-lg text-base font-medium <?php echo $current_page === 'dashboard.php' ? 'text-red-400 bg-red-950/40 font-semibold' : 'text-zinc-300 hover:bg-gaming-800'; ?>">
+            <a href="/dashboard.php" class="block px-3 py-2 rounded-lg text-base font-medium <?php echo $current_page === 'dashboard.php' ? 'text-red-400 bg-red-950/40' : 'text-zinc-300 hover:text-white hover:bg-gaming-800'; ?>">
                 Dashboard
             </a>
-            <a href="/orders.php" class="block px-3 py-2.5 rounded-lg text-base font-medium <?php echo $current_page === 'orders.php' ? 'text-red-400 bg-red-950/40 font-semibold' : 'text-zinc-300 hover:bg-gaming-800'; ?>">
+            <a href="/orders.php" class="block px-3 py-2 rounded-lg text-base font-medium <?php echo $current_page === 'orders.php' ? 'text-red-400 bg-red-950/40' : 'text-zinc-300 hover:text-white hover:bg-gaming-800'; ?>">
                 My Orders
             </a>
-            <a href="/wallet.php" class="block px-3 py-2.5 rounded-lg text-base font-medium <?php echo $current_page === 'wallet.php' ? 'text-red-400 bg-red-950/40 font-semibold' : 'text-zinc-300 hover:bg-gaming-800'; ?>">
-                Wallet & Add Money (<?php echo format_currency($user['wallet_balance']); ?>)
+            <a href="/wallet.php" class="block px-3 py-2 rounded-lg text-base font-medium <?php echo $current_page === 'wallet.php' ? 'text-red-400 bg-red-950/40' : 'text-zinc-300 hover:text-white hover:bg-gaming-800'; ?>">
+                Wallet & Add Money
             </a>
-            <a href="/tickets.php" class="block px-3 py-2.5 rounded-lg text-base font-medium <?php echo $current_page === 'tickets.php' ? 'text-red-400 bg-red-950/40 font-semibold' : 'text-zinc-300 hover:bg-gaming-800'; ?>">
+            <a href="/referral.php" class="block px-3 py-2 rounded-lg text-base font-medium <?php echo $current_page === 'referral.php' ? 'text-red-400 bg-red-950/40' : 'text-zinc-300 hover:text-white hover:bg-gaming-800'; ?>">
+                Refer & Earn
+            </a>
+            <a href="/notifications.php" class="block px-3 py-2 rounded-lg text-base font-medium <?php echo $current_page === 'notifications.php' ? 'text-red-400 bg-red-950/40' : 'text-zinc-300 hover:text-white hover:bg-gaming-800'; ?>">
+                Notifications (<?php echo $unread_notifs; ?>)
+            </a>
+            <a href="/profile.php" class="block px-3 py-2 rounded-lg text-base font-medium <?php echo $current_page === 'profile.php' ? 'text-red-400 bg-red-950/40' : 'text-zinc-300 hover:text-white hover:bg-gaming-800'; ?>">
+                Player Profile & UID
+            </a>
+            <a href="/tickets.php" class="block px-3 py-2 rounded-lg text-base font-medium <?php echo $current_page === 'tickets.php' ? 'text-red-400 bg-red-950/40' : 'text-zinc-300 hover:text-white hover:bg-gaming-800'; ?>">
                 Support Tickets
             </a>
-            <a href="/profile.php" class="block px-3 py-2.5 rounded-lg text-base font-medium <?php echo $current_page === 'profile.php' ? 'text-red-400 bg-red-950/40 font-semibold' : 'text-zinc-300 hover:bg-gaming-800'; ?>">
-                Profile & Free Fire UID
+            <div class="border-t border-gaming-border my-2"></div>
+            <a href="/logout.php" class="block px-3 py-2 rounded-lg text-base font-medium text-red-400 hover:bg-red-950/40">
+                Logout
             </a>
-            <?php if (is_admin_logged_in()): ?>
-                <a href="/admin/index.php" class="block px-3 py-2.5 rounded-lg text-base font-medium text-amber-400 bg-amber-950/30 border border-amber-800/40">
-                    Admin Panel
-                </a>
-            <?php endif; ?>
-            <div class="pt-2 border-t border-gaming-border">
-                <a href="/logout.php" class="block px-3 py-2.5 rounded-lg text-base font-medium text-red-400 hover:bg-red-950/40">
-                    Logout (<?php echo e($user['username']); ?>)
-                </a>
-            </div>
         <?php else: ?>
-            <div class="grid grid-cols-2 gap-3 pt-2">
-                <a href="/login.php" class="text-center px-4 py-2.5 rounded-lg bg-gaming-800 text-white font-medium border border-gaming-border">
+            <div class="pt-2 flex flex-col gap-2">
+                <a href="/login.php" class="w-full text-center px-4 py-2.5 rounded-lg text-sm font-medium bg-gaming-800 text-white border border-gaming-border">
                     Login
                 </a>
-                <a href="/register.php" class="text-center btn-gaming-red px-4 py-2.5 rounded-lg text-white font-medium">
-                    Register
+                <a href="/register.php" class="w-full text-center btn-gaming-red text-white font-medium px-4 py-2.5 rounded-lg text-sm">
+                    Create Account
                 </a>
             </div>
+        <?php endif; ?>
+
+        <?php if (is_admin_logged_in()): ?>
+            <div class="border-t border-gaming-border my-2"></div>
+            <a href="/admin/index.php" class="block px-3 py-2 rounded-lg text-base font-medium text-red-300 bg-red-950/60 border border-red-800/40">
+                Admin Panel &rarr;
+            </a>
         <?php endif; ?>
     </div>
 </header>
 
 <script>
-// Plain JavaScript Navbar interactions
-document.addEventListener('DOMContentLoaded', function () {
-    const mobileBtn = document.getElementById('mobileMenuBtn');
-    const mobileMenu = document.getElementById('mobileMenu');
-    if (mobileBtn && mobileMenu) {
-        mobileBtn.addEventListener('click', function () {
-            mobileMenu.classList.toggle('hidden');
-        });
-    }
+// Toggle user dropdown on desktop
+const userBtn = document.getElementById('userMenuBtn');
+const userDropdown = document.getElementById('userMenuDropdown');
+if (userBtn && userDropdown) {
+    userBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        userDropdown.classList.toggle('hidden');
+    });
+    document.addEventListener('click', () => {
+        if (!userDropdown.classList.contains('hidden')) {
+            userDropdown.classList.add('hidden');
+        }
+    });
+}
 
-    const userBtn = document.getElementById('userMenuBtn');
-    const userDropdown = document.getElementById('userMenuDropdown');
-    if (userBtn && userDropdown) {
-        userBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            userDropdown.classList.toggle('hidden');
-        });
-        document.addEventListener('click', function (e) {
-            if (!userDropdown.contains(e.target) && !userBtn.contains(e.target)) {
-                userDropdown.classList.add('hidden');
-            }
-        });
-    }
-});
+// Toggle mobile menu drawer
+const mobileBtn = document.getElementById('mobileMenuBtn');
+const mobileDrawer = document.getElementById('mobileDrawer');
+if (mobileBtn && mobileDrawer) {
+    mobileBtn.addEventListener('click', () => {
+        mobileDrawer.classList.toggle('hidden');
+    });
+}
 </script>

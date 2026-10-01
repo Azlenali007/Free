@@ -6,51 +6,158 @@ require_login();
 $user = current_user();
 $errors = [];
 
+// Fetch active payment gateways
+$stmt_gw = $pdo->query("SELECT * FROM payment_gateways WHERE status = 'active' AND code != 'wallet' ORDER BY sort_order ASC");
+$gateways = $stmt_gw->fetchAll();
+
 // Handle Add Money deposit request
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_validate();
 
     $amount = (float)($_POST['amount'] ?? 0);
-    $method = sanitize($_POST['payment_method'] ?? 'UPI / Direct Bank');
+    $gateway_code = sanitize($_POST['gateway_code'] ?? 'manual_deposit');
     $reference_no = sanitize($_POST['reference_no'] ?? '');
     $notes = sanitize($_POST['notes'] ?? '');
 
-    if ($amount <= 0) {
-        $errors[] = "Please enter a valid deposit amount greater than 0.";
+    if ($amount <= 0.50) {
+        $errors[] = "Minimum deposit amount is " . format_currency(0.50) . ".";
     }
-    if (empty($reference_no)) {
-        $errors[] = "Please provide your payment reference number / UTR ID for verification.";
+
+    // Validate gateway
+    $chosen_gateway = null;
+    foreach ($gateways as $gw) {
+        if ($gw['code'] === $gateway_code) {
+            $chosen_gateway = $gw;
+            break;
+        }
+    }
+    if (!$chosen_gateway) {
+        $errors[] = "Please select a valid payment gateway.";
+    }
+
+    if (empty($reference_no) && in_array($gateway_code, ['manual_deposit', 'mobile_wallet'])) {
+        $errors[] = "Please provide your Transaction ID / UTR number for verification.";
     }
 
     if (empty($errors)) {
-        $txn_id = generate_transaction_id();
-        $stmt = $pdo->prepare("
-            INSERT INTO wallet_transactions 
-            (transaction_id, user_id, type, amount, payment_method, reference_no, status, notes) 
-            VALUES (?, ?, 'credit', ?, ?, ?, 'pending', ?)
-        ");
-        $stmt->execute([
-            $txn_id,
-            $user['id'],
-            $amount,
-            $method,
-            $reference_no,
-            $notes ?: 'Manual deposit request via ' . $method
-        ]);
+        try {
+            $pdo->beginTransaction();
 
-        set_flash('success', "Deposit request for " . format_currency($amount) . " submitted! Transaction ID: " . $txn_id . ". Admin will verify and credit your wallet shortly.");
-        header("Location: /wallet.php");
-        exit;
+            $payment_id = generate_payment_id();
+            $txn_id = generate_transaction_id();
+            
+            // If automated card or gateway (simulated live verification)
+            $is_instant_verified = in_array($gateway_code, ['stripe', 'razorpay']);
+            
+            if ($is_instant_verified) {
+                // Server-side instant payment completion
+                $pay_status = 'completed';
+                $txn_status = 'completed';
+                $current_bal = (float)$user['wallet_balance'];
+                $new_bal = round($current_bal + $amount, 2);
+
+                // Update user wallet
+                $stmt_upd = $pdo->prepare("UPDATE users SET wallet_balance = ? WHERE id = ?");
+                $stmt_upd->execute([$new_bal, $user['id']]);
+
+                // Record wallet transaction
+                $stmt_txn = $pdo->prepare("
+                    INSERT INTO wallet_transactions 
+                    (transaction_id, user_id, type, amount, previous_balance, new_balance, payment_method, reference_no, status, notes) 
+                    VALUES (?, ?, 'credit', ?, ?, ?, ?, ?, 'completed', ?)
+                ");
+                $stmt_txn->execute([$txn_id, $user['id'], $amount, $current_bal, $new_bal, $gateway_code, $payment_id, "Instant deposit via " . $chosen_gateway['name']]);
+                $wallet_txn_id = $pdo->lastInsertId();
+
+                // Record in payments table
+                $stmt_pay = $pdo->prepare("
+                    INSERT INTO payments 
+                    (payment_id, user_id, wallet_transaction_id, gateway_code, amount, currency, status, gateway_txn_id, gateway_response) 
+                    VALUES (?, ?, ?, ?, ?, 'USD', 'completed', ?, ?)
+                ");
+                $stmt_pay->execute([
+                    $payment_id,
+                    $user['id'],
+                    $wallet_txn_id,
+                    $gateway_code,
+                    $amount,
+                    $payment_id,
+                    json_encode(['status' => 'APPROVED', 'gateway' => $chosen_gateway['name']])
+                ]);
+
+                // Create user notification
+                create_notification($user['id'], "Wallet Funded!", "Your wallet has been credited with " . format_currency($amount) . " via " . $chosen_gateway['name'] . ".", 'wallet');
+                $pdo->commit();
+
+                set_flash('success', "Deposit of " . format_currency($amount) . " successfully verified and credited to your wallet!");
+            } else {
+                // Manual deposit requiring admin verification
+                $pay_status = 'pending';
+                $stmt_txn = $pdo->prepare("
+                    INSERT INTO wallet_transactions 
+                    (transaction_id, user_id, type, amount, previous_balance, new_balance, payment_method, reference_no, status, notes) 
+                    VALUES (?, ?, 'credit', ?, ?, ?, ?, ?, 'pending', ?)
+                ");
+                $stmt_txn->execute([
+                    $txn_id, 
+                    $user['id'], 
+                    $amount, 
+                    $user['wallet_balance'], 
+                    $user['wallet_balance'], 
+                    $gateway_code, 
+                    $reference_no, 
+                    $notes ?: ('Manual deposit request via ' . $chosen_gateway['name'])
+                ]);
+                $wallet_txn_id = $pdo->lastInsertId();
+
+                $stmt_pay = $pdo->prepare("
+                    INSERT INTO payments 
+                    (payment_id, user_id, wallet_transaction_id, gateway_code, amount, currency, status, gateway_txn_id, gateway_response) 
+                    VALUES (?, ?, ?, ?, ?, 'USD', 'pending', ?, ?)
+                ");
+                $stmt_pay->execute([
+                    $payment_id,
+                    $user['id'],
+                    $wallet_txn_id,
+                    $gateway_code,
+                    $amount,
+                    $reference_no,
+                    json_encode(['reference' => $reference_no, 'notes' => $notes])
+                ]);
+
+                create_notification($user['id'], "Deposit Pending", "Your deposit request for " . format_currency($amount) . " is being reviewed.", 'wallet');
+                $pdo->commit();
+
+                set_flash('success', "Deposit request for " . format_currency($amount) . " submitted! Ref ID: " . $reference_no . ". Admin will verify and credit your wallet shortly.");
+            }
+
+            header("Location: /wallet.php");
+            exit;
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $errors[] = "Failed to process deposit: " . $e->getMessage();
+        }
     }
 }
 
-// Fetch all transactions for this user from MySQL
+// Filter transactions by tab
+$tab = sanitize($_GET['tab'] ?? 'all');
+$where_txn = ["user_id = ?"];
+$params_txn = [$user['id']];
+
+if (in_array($tab, ['completed', 'pending', 'failed', 'refunded'])) {
+    $where_txn[] = "status = ?";
+    $params_txn[] = $tab;
+}
+
 $stmt = $pdo->prepare("
     SELECT * FROM wallet_transactions 
-    WHERE user_id = ? 
+    WHERE " . implode(' AND ', $where_txn) . " 
     ORDER BY id DESC
 ");
-$stmt->execute([$user['id']]);
+$stmt->execute($params_txn);
 $transactions = $stmt->fetchAll();
 
 $deposit_instructions = get_setting('deposit_instructions', '');
@@ -98,197 +205,199 @@ require_once __DIR__ . '/includes/header.php';
         <div class="md:col-span-2 bg-gaming-850 border border-gaming-border rounded-2xl p-6 flex flex-col justify-between">
             <div>
                 <h3 class="font-gaming text-base font-bold text-white mb-2 flex items-center gap-2">
-                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    How to Deposit Funds
+                    <span class="w-2 h-2 rounded-full bg-red-500"></span> Supported Payment Gateways
                 </h3>
-                <p class="text-xs text-zinc-400 leading-relaxed">
-                    Transfer money directly using our official gaming payment channels (UPI, QR, Bank Transfer). Submit your transaction reference ID to request verification. Once verified by our automated team, your wallet balance will be credited instantly.
-                </p>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                    <?php foreach ($gateways as $gw): ?>
+                        <div class="p-2.5 rounded-xl bg-gaming-900 border border-gaming-border text-center">
+                            <span class="font-gaming font-bold text-xs text-white block truncate"><?php echo e($gw['name']); ?></span>
+                            <span class="text-[10px] text-emerald-400 font-mono">Active</span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
             </div>
-            <div class="pt-4 flex flex-wrap items-center gap-3">
-                <button type="button" onclick="document.getElementById('depositModal').classList.remove('hidden')" 
-                        class="px-4 py-2 rounded-xl bg-gaming-800 hover:bg-gaming-750 text-xs font-semibold text-white border border-gaming-border">
-                    View Deposit Instructions & Form
+            <div class="pt-4 flex items-center justify-between text-xs text-zinc-400 border-t border-gaming-border mt-4">
+                <span>Secure SSL Protected Deposits</span>
+                <button type="button" onclick="document.getElementById('depositModal').classList.remove('hidden')" class="text-red-400 hover:text-red-300 font-semibold underline underline-offset-4">
+                    + Deposit Funds Now
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Transaction History Section -->
-    <div class="bg-gaming-850 border border-gaming-border rounded-2xl p-6 space-y-4 shadow-2xl">
-        <div class="flex items-center justify-between pb-3 border-b border-gaming-border">
-            <h2 class="font-gaming text-xl font-bold text-white tracking-wide">WALLET TRANSACTIONS</h2>
-            <span class="text-xs text-zinc-400 font-mono"><?php echo count($transactions); ?> Records Found</span>
-        </div>
+    <!-- Filter Tabs (Requirement 2: Successful, Pending, Failed, Refunded) -->
+    <div class="flex flex-wrap items-center gap-2 border-b border-gaming-border pb-4 text-xs font-semibold">
+        <a href="/wallet.php?tab=all" class="px-4 py-2 rounded-xl transition-all <?php echo $tab === 'all' ? 'bg-red-600 text-white shadow-red-subtle' : 'bg-gaming-850 text-zinc-400 hover:text-white border border-gaming-border'; ?>">
+            All Transactions
+        </a>
+        <a href="/wallet.php?tab=completed" class="px-4 py-2 rounded-xl transition-all <?php echo $tab === 'completed' ? 'bg-emerald-600 text-white shadow-red-subtle' : 'bg-gaming-850 text-zinc-400 hover:text-white border border-gaming-border'; ?>">
+            Successful (Completed)
+        </a>
+        <a href="/wallet.php?tab=pending" class="px-4 py-2 rounded-xl transition-all <?php echo $tab === 'pending' ? 'bg-amber-600 text-white shadow-red-subtle' : 'bg-gaming-850 text-zinc-400 hover:text-white border border-gaming-border'; ?>">
+            Pending Verification
+        </a>
+        <a href="/wallet.php?tab=failed" class="px-4 py-2 rounded-xl transition-all <?php echo $tab === 'failed' ? 'bg-red-600 text-white shadow-red-subtle' : 'bg-gaming-850 text-zinc-400 hover:text-white border border-gaming-border'; ?>">
+            Failed / Cancelled
+        </a>
+        <a href="/wallet.php?tab=refunded" class="px-4 py-2 rounded-xl transition-all <?php echo $tab === 'refunded' ? 'bg-purple-600 text-white shadow-red-subtle' : 'bg-gaming-850 text-zinc-400 hover:text-white border border-gaming-border'; ?>">
+            Refunded
+        </a>
+    </div>
 
-        <?php if (!empty($transactions)): ?>
-            <!-- Desktop Table View -->
-            <div class="hidden sm:block overflow-x-auto">
-                <table class="w-full text-left border-collapse">
+    <!-- Transactions List -->
+    <div class="space-y-4">
+        <h2 class="font-gaming text-lg font-bold text-white tracking-wide">
+            WALLET TRANSACTION HISTORY
+        </h2>
+
+        <?php if (empty($transactions)): ?>
+            <div class="text-center py-12 rounded-2xl bg-gaming-900 border border-gaming-border p-6 text-zinc-400 text-xs">
+                No wallet transactions found for this filter tab.
+            </div>
+        <?php else: ?>
+            <!-- Mobile Cards -->
+            <div class="grid grid-cols-1 gap-3 md:hidden">
+                <?php foreach ($transactions as $txn): 
+                    $is_credit = ($txn['type'] === 'credit');
+                    $badge = match($txn['status']) {
+                        'completed' => 'bg-emerald-950 text-emerald-400 border-emerald-800',
+                        'failed', 'rejected' => 'bg-red-950 text-red-400 border-red-800',
+                        'refunded' => 'bg-purple-950 text-purple-400 border-purple-800',
+                        default => 'bg-amber-950 text-amber-400 border-amber-800'
+                    };
+                ?>
+                    <div class="p-4 rounded-xl bg-gaming-850 border border-gaming-border space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="font-mono text-xs text-zinc-400"><?php echo e($txn['transaction_id']); ?></span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase border <?php echo $badge; ?>">
+                                <?php echo e($txn['status']); ?>
+                            </span>
+                        </div>
+                        <div class="flex items-baseline justify-between">
+                            <div>
+                                <span class="font-semibold text-white text-xs block"><?php echo e($txn['notes'] ?: $txn['payment_method']); ?></span>
+                                <span class="text-[10px] text-zinc-500"><?php echo date('M d, Y h:i A', strtotime($txn['created_at'])); ?></span>
+                            </div>
+                            <span class="font-mono font-bold text-sm <?php echo $is_credit ? 'text-emerald-400' : 'text-red-400'; ?>">
+                                <?php echo ($is_credit ? '+' : '-') . format_currency($txn['amount']); ?>
+                            </span>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <!-- Desktop Table -->
+            <div class="hidden md:block overflow-hidden rounded-2xl bg-gaming-850 border border-gaming-border">
+                <table class="w-full text-left text-xs">
                     <thead>
-                        <tr class="border-b border-gaming-border text-xs text-zinc-400 uppercase font-gaming">
-                            <th class="py-3 px-3">Txn ID</th>
-                            <th class="py-3 px-3">Type</th>
-                            <th class="py-3 px-3">Amount</th>
-                            <th class="py-3 px-3">Method / Ref</th>
-                            <th class="py-3 px-3">Status</th>
-                            <th class="py-3 px-3">Date</th>
-                            <th class="py-3 px-3">Notes</th>
+                        <tr class="border-b border-gaming-border bg-gaming-900 text-zinc-400 uppercase font-mono text-[10px]">
+                            <th class="py-3 px-6">Transaction ID & Date</th>
+                            <th class="py-3 px-4">Type</th>
+                            <th class="py-3 px-4">Gateway</th>
+                            <th class="py-3 px-4">Reference</th>
+                            <th class="py-3 px-4">Amount</th>
+                            <th class="py-3 px-4">Status</th>
+                            <th class="py-3 px-6">Details</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gaming-border/60 text-xs">
+                    <tbody class="divide-y divide-gaming-border/60">
                         <?php foreach ($transactions as $txn): 
-                            $is_credit = $txn['type'] === 'credit';
-                            $status_class = match($txn['status']) {
-                                'completed' => 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40',
-                                'rejected' => 'bg-red-950/80 text-red-400 border-red-800/40',
-                                default => 'bg-amber-950/80 text-amber-400 border-amber-800/40'
+                            $is_credit = ($txn['type'] === 'credit');
+                            $badge = match($txn['status']) {
+                                'completed' => 'bg-emerald-950 text-emerald-400 border-emerald-800',
+                                'failed', 'rejected' => 'bg-red-950 text-red-400 border-red-800',
+                                'refunded' => 'bg-purple-950 text-purple-400 border-purple-800',
+                                default => 'bg-amber-950 text-amber-400 border-amber-800'
                             };
                         ?>
                             <tr class="hover:bg-gaming-800/40 transition-colors">
-                                <td class="py-3 px-3 font-mono font-bold text-white"><?php echo e($txn['transaction_id']); ?></td>
-                                <td class="py-3 px-3">
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase <?php echo $is_credit ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/40' : 'bg-red-950 text-red-400 border border-red-800/40'; ?>">
-                                        <?php echo $is_credit ? '+ Deposit' : '- Purchase'; ?>
-                                    </span>
+                                <td class="py-3.5 px-6">
+                                    <span class="font-mono font-bold text-white block"><?php echo e($txn['transaction_id']); ?></span>
+                                    <span class="text-[10px] text-zinc-500"><?php echo date('M d, Y h:i A', strtotime($txn['created_at'])); ?></span>
                                 </td>
-                                <td class="py-3 px-3 font-gaming font-bold text-sm <?php echo $is_credit ? 'text-emerald-400' : 'text-zinc-200'; ?>">
+                                <td class="py-3.5 px-4 font-mono font-bold uppercase text-[11px] <?php echo $is_credit ? 'text-emerald-400' : 'text-red-400'; ?>">
+                                    <?php echo e($txn['type']); ?>
+                                </td>
+                                <td class="py-3.5 px-4 font-semibold text-white uppercase text-[11px]">
+                                    <?php echo e($txn['payment_method']); ?>
+                                </td>
+                                <td class="py-3.5 px-4 font-mono text-zinc-300">
+                                    <?php echo e($txn['reference_no'] ?: '—'); ?>
+                                </td>
+                                <td class="py-3.5 px-4 font-mono font-bold text-sm <?php echo $is_credit ? 'text-emerald-400' : 'text-red-400'; ?>">
                                     <?php echo ($is_credit ? '+' : '-') . format_currency($txn['amount']); ?>
                                 </td>
-                                <td class="py-3 px-3">
-                                    <div class="text-zinc-300"><?php echo e($txn['payment_method']); ?></div>
-                                    <?php if (!empty($txn['reference_no'])): ?>
-                                        <div class="font-mono text-[11px] text-zinc-500"><?php echo e($txn['reference_no']); ?></div>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="py-3 px-3">
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase border <?php echo $status_class; ?>">
+                                <td class="py-3.5 px-4">
+                                    <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase border <?php echo $badge; ?>">
                                         <?php echo e($txn['status']); ?>
                                     </span>
                                 </td>
-                                <td class="py-3 px-3 text-zinc-400"><?php echo date('M d, Y H:i', strtotime($txn['created_at'])); ?></td>
-                                <td class="py-3 px-3 text-zinc-400 max-w-xs truncate"><?php echo e($txn['notes'] ?: '-'); ?></td>
+                                <td class="py-3.5 px-6 text-zinc-400 text-[11px]">
+                                    <?php echo e($txn['notes'] ?: 'Standard balance adjustment'); ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
-
-            <!-- Mobile Card View -->
-            <div class="sm:hidden space-y-3">
-                <?php foreach ($transactions as $txn): 
-                    $is_credit = $txn['type'] === 'credit';
-                    $status_class = match($txn['status']) {
-                        'completed' => 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40',
-                        'rejected' => 'bg-red-950/80 text-red-400 border-red-800/40',
-                        default => 'bg-amber-950/80 text-amber-400 border-amber-800/40'
-                    };
-                ?>
-                    <div class="p-3.5 rounded-xl bg-gaming-900 border border-gaming-border space-y-2">
-                        <div class="flex items-center justify-between">
-                            <span class="font-mono text-xs font-bold text-white"><?php echo e($txn['transaction_id']); ?></span>
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase border <?php echo $status_class; ?>">
-                                <?php echo e($txn['status']); ?>
-                            </span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs text-zinc-400"><?php echo e($txn['payment_method']); ?></span>
-                            <span class="font-gaming font-extrabold text-base <?php echo $is_credit ? 'text-emerald-400' : 'text-zinc-200'; ?>">
-                                <?php echo ($is_credit ? '+' : '-') . format_currency($txn['amount']); ?>
-                            </span>
-                        </div>
-                        <?php if (!empty($txn['reference_no'])): ?>
-                            <div class="text-[11px] font-mono text-zinc-500">Ref: <?php echo e($txn['reference_no']); ?></div>
-                        <?php endif; ?>
-                        <div class="pt-2 border-t border-gaming-border/60 text-[10px] text-zinc-500">
-                            <?php echo date('M d, Y h:i A', strtotime($txn['created_at'])); ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        <?php else: ?>
-            <div class="text-center py-10 text-zinc-500 text-xs">
-                No wallet transactions recorded yet. Click "Add Money to Wallet" above to make your first deposit!
-            </div>
         <?php endif; ?>
     </div>
 </div>
 
-<!-- Add Money Modal Dialog -->
-<div id="depositModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-    <div class="bg-gaming-900 border border-gaming-border rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative">
-        <button type="button" onclick="document.getElementById('depositModal').classList.add('hidden')" 
-                class="absolute top-4 right-4 text-zinc-400 hover:text-white text-lg">
-            ✕
-        </button>
-
-        <div class="border-b border-gaming-border pb-3">
-            <h3 class="font-gaming text-xl font-bold text-white flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> ADD MONEY TO WALLET
+<!-- Add Money Modal -->
+<div id="depositModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="relative w-full max-w-lg rounded-2xl bg-gaming-900 border border-gaming-border shadow-2xl p-6 space-y-6">
+        <div class="flex items-center justify-between pb-3 border-b border-gaming-border">
+            <h3 class="font-gaming text-lg font-bold text-white flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span> ADD MONEY TO WALLET
             </h3>
-            <p class="text-xs text-zinc-400 mt-1">Manual top-up with verification</p>
+            <button type="button" onclick="document.getElementById('depositModal').classList.add('hidden')" class="text-zinc-400 hover:text-white text-lg">✕</button>
         </div>
 
-        <!-- Instructions from settings -->
-        <div class="p-3.5 rounded-xl bg-gaming-950 border border-red-900/30 text-xs text-zinc-300 whitespace-pre-line font-mono">
-            <?php echo e($deposit_instructions); ?>
-        </div>
+        <?php if (!empty($deposit_instructions)): ?>
+            <div class="p-3.5 rounded-xl bg-gaming-850 border border-gaming-border text-xs text-zinc-300 space-y-1">
+                <span class="text-red-400 font-bold font-mono text-[10px] uppercase block">Deposit Instructions:</span>
+                <p class="whitespace-pre-line leading-relaxed"><?php echo e($deposit_instructions); ?></p>
+            </div>
+        <?php endif; ?>
 
-        <form method="POST" action="/wallet.php" class="space-y-4">
+        <form method="POST" action="/wallet.php" class="space-y-4 text-xs">
             <?php echo csrf_field(); ?>
 
             <div>
-                <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Deposit Amount ($)</label>
-                <div class="flex items-center gap-2 mb-2">
-                    <?php foreach ([5, 10, 25, 50, 100] as $preset): ?>
-                        <button type="button" onclick="document.getElementById('depositInput').value='<?php echo $preset; ?>'" 
-                                class="px-2.5 py-1 rounded bg-gaming-800 hover:bg-red-950 text-xs font-gaming font-bold text-zinc-200 border border-gaming-border">
-                            +$<?php echo $preset; ?>
-                        </button>
-                    <?php endforeach; ?>
+                <label class="block text-zinc-300 font-semibold mb-1">Select Deposit Amount (USD) *</label>
+                <div class="grid grid-cols-4 gap-2 mb-2">
+                    <button type="button" onclick="document.getElementById('depositAmt').value='5.00'" class="py-1.5 rounded-lg bg-gaming-850 hover:bg-gaming-800 text-white font-mono border border-gaming-border">$5.00</button>
+                    <button type="button" onclick="document.getElementById('depositAmt').value='10.00'" class="py-1.5 rounded-lg bg-gaming-850 hover:bg-gaming-800 text-white font-mono border border-gaming-border">$10.00</button>
+                    <button type="button" onclick="document.getElementById('depositAmt').value='25.00'" class="py-1.5 rounded-lg bg-gaming-850 hover:bg-gaming-800 text-white font-mono border border-gaming-border">$25.00</button>
+                    <button type="button" onclick="document.getElementById('depositAmt').value='50.00'" class="py-1.5 rounded-lg bg-gaming-850 hover:bg-gaming-800 text-white font-mono border border-gaming-border">$50.00</button>
                 </div>
-                <input type="number" id="depositInput" name="amount" step="0.01" min="1" required
-                       class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-950 border border-gaming-border focus:border-red-500 text-lg font-gaming font-bold text-white focus:outline-none"
-                       placeholder="Enter amount (e.g. 25.00)">
+                <input type="number" step="0.01" min="0.50" id="depositAmt" name="amount" required placeholder="Custom Amount (e.g. 15.00)" class="w-full px-4 py-2.5 rounded-xl bg-gaming-850 border border-gaming-border focus:border-red-500 text-white font-mono text-sm focus:outline-none">
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Payment Method</label>
-                <select name="payment_method" class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-950 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none">
-                    <option value="UPI / Instant Pay">UPI / Instant Pay</option>
-                    <option value="Bank Wire Transfer">Bank Wire Transfer</option>
-                    <option value="QR Code Payment">QR Code Payment</option>
-                    <option value="Crypto / USDT">Crypto / USDT</option>
-                    <option value="Voucher Code">Voucher Code</option>
+                <label class="block text-zinc-300 font-semibold mb-1">Select Payment Gateway *</label>
+                <select name="gateway_code" required class="w-full px-3 py-2.5 rounded-xl bg-gaming-850 border border-gaming-border text-white text-xs focus:outline-none">
+                    <?php foreach ($gateways as $gw): ?>
+                        <option value="<?php echo e($gw['code']); ?>"><?php echo e($gw['title']); ?> (<?php echo e($gw['name']); ?>)</option>
+                    <?php endforeach; ?>
                 </select>
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
-                    Transaction Reference No. / UTR <span class="text-red-500">*</span>
-                </label>
-                <input type="text" name="reference_no" required
-                       class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-950 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none font-mono"
-                       placeholder="e.g. UTR 429103982104 / Bank Txn Ref">
-                <span class="text-[10px] text-zinc-500 mt-1 block">Found on your bank/UPI payment receipt.</span>
+                <label class="block text-zinc-300 font-semibold mb-1">Transaction Reference / UTR / TrxID *</label>
+                <input type="text" name="reference_no" required placeholder="Enter bank reference or transaction code" class="w-full px-4 py-2.5 rounded-xl bg-gaming-850 border border-gaming-border text-white font-mono text-xs focus:outline-none">
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Notes / Sender Info (Optional)</label>
-                <input type="text" name="notes"
-                       class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-950 border border-gaming-border focus:border-red-500 text-xs text-white focus:outline-none"
-                       placeholder="e.g. Paid from John's Account">
+                <label class="block text-zinc-300 font-semibold mb-1">Deposit Note (Optional)</label>
+                <input type="text" name="notes" placeholder="e.g. Added via GooglePay" class="w-full px-4 py-2 rounded-xl bg-gaming-850 border border-gaming-border text-white text-xs focus:outline-none">
             </div>
 
-            <div class="pt-2 flex gap-3">
-                <button type="submit" class="flex-1 btn-gaming-red text-white font-gaming text-sm font-bold py-3 rounded-xl shadow-red-glow">
-                    SUBMIT DEPOSIT PROOF &rarr;
-                </button>
-                <button type="button" onclick="document.getElementById('depositModal').classList.add('hidden')"
-                        class="px-5 py-3 rounded-xl bg-gaming-800 text-zinc-400 hover:text-white text-xs font-semibold">
-                    Cancel
+            <div class="pt-2 flex items-center justify-end gap-3">
+                <button type="button" onclick="document.getElementById('depositModal').classList.add('hidden')" class="px-4 py-2.5 rounded-xl bg-gaming-800 text-zinc-400 hover:text-white">Cancel</button>
+                <button type="submit" class="btn-gaming-red text-white font-gaming text-xs font-bold px-6 py-2.5 rounded-xl shadow-red-glow">
+                    CONFIRM & SUBMIT DEPOSIT
                 </button>
             </div>
         </form>

@@ -14,9 +14,15 @@ $username = '';
 $email = '';
 $phone = '';
 $ff_uid = '';
+$ref_code = sanitize($_GET['ref'] ?? $_POST['ref'] ?? '');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_validate();
+
+    // Rate Limiting
+    if (!check_rate_limit('register', 10, 300)) {
+        $errors[] = "Too many registration attempts from your IP. Please wait a few minutes.";
+    }
 
     $name = sanitize($_POST['name'] ?? '');
     $username = sanitize($_POST['username'] ?? '');
@@ -25,6 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ff_uid = sanitize($_POST['ff_uid'] ?? '');
     $password = (string)($_POST['password'] ?? '');
     $confirm_password = (string)($_POST['confirm_password'] ?? '');
+    $ref_code = sanitize($_POST['ref'] ?? '');
 
     // Validation
     if (empty($name)) {
@@ -52,15 +59,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // Check referral code
+    $referred_by_id = null;
+    if (!empty($ref_code) && empty($errors)) {
+        $stmt_ref = $pdo->prepare("SELECT id FROM users WHERE referral_code = ?");
+        $stmt_ref->execute([$ref_code]);
+        $ref_user = $stmt_ref->fetch();
+        if ($ref_user) {
+            $referred_by_id = $ref_user['id'];
+        }
+    }
+
     // Insert user into MySQL
     if (empty($errors)) {
         $hashed = password_hash($password, PASSWORD_DEFAULT);
+        $my_ref_code = 'FZ' . strtoupper(substr(md5(uniqid($username, true)), 0, 6));
+
         $stmt = $pdo->prepare("
-            INSERT INTO users (name, username, email, password, phone, ff_uid, wallet_balance, status) 
-            VALUES (?, ?, ?, ?, ?, ?, 0.00, 'active')
+            INSERT INTO users (name, username, email, password, phone, ff_uid, referral_code, referred_by, wallet_balance, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0.00, 'active')
         ");
-        $stmt->execute([$name, $username, $email, $hashed, $phone, $ff_uid]);
+        $stmt->execute([$name, $username, $email, $hashed, $phone, $ff_uid, $my_ref_code, $referred_by_id]);
         $new_user_id = $pdo->lastInsertId();
+
+        // Create welcome notification
+        create_notification(
+            $new_user_id, 
+            "Welcome to FireZone Store!", 
+            "Your gamer account is ready. Deposit to your wallet for 1-click Free Fire top-ups.", 
+            'account', 
+            '/wallet.php'
+        );
+
+        log_security_event('user_registered', "New user registered: {$username} ({$email})", 'info', $new_user_id);
 
         // Automatically log in
         $_SESSION['user_id'] = $new_user_id;
@@ -82,6 +113,11 @@ require_once __DIR__ . '/includes/header.php';
         <div class="text-center mb-6">
             <h1 class="font-gaming text-2xl font-bold text-white tracking-wider">CREATE GAMER ACCOUNT</h1>
             <p class="text-xs text-zinc-400 mt-1">Join FireZone for instant Free Fire top-ups & wallet perks</p>
+            <?php if (!empty($ref_code)): ?>
+                <div class="mt-2 inline-block px-2.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-mono">
+                    Referral Code Applied: <?php echo e($ref_code); ?>
+                </div>
+            <?php endif; ?>
         </div>
 
         <?php if (!empty($errors)): ?>
@@ -92,61 +128,52 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         <?php endif; ?>
 
-        <form method="POST" action="/register.php" class="space-y-4">
+        <form method="POST" action="/register.php" class="space-y-4 text-xs">
             <?php echo csrf_field(); ?>
+            <?php if (!empty($ref_code)): ?>
+                <input type="hidden" name="ref" value="<?php echo e($ref_code); ?>">
+            <?php endif; ?>
 
             <div>
-                <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Full Name</label>
-                <input type="text" name="name" value="<?php echo e($name); ?>" required
-                       class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none transition-colors"
-                       placeholder="e.g. Alex Drake">
-            </div>
-
-            <div>
-                <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Username</label>
-                <input type="text" name="username" value="<?php echo e($username); ?>" required
-                       class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none transition-colors"
-                       placeholder="e.g. shadow_sniper">
+                <label class="block text-zinc-300 font-semibold mb-1">Full Name *</label>
+                <input type="text" name="name" value="<?php echo e($name); ?>" required placeholder="e.g. John Doe" class="w-full px-4 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-white text-xs focus:outline-none">
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Email Address</label>
-                <input type="email" name="email" value="<?php echo e($email); ?>" required
-                       class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none transition-colors"
-                       placeholder="gamer@example.com">
+                <label class="block text-zinc-300 font-semibold mb-1">Username *</label>
+                <input type="text" name="username" value="<?php echo e($username); ?>" required placeholder="e.g. fire_gamer" class="w-full px-4 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-white font-mono text-xs focus:outline-none">
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Free Fire UID (Optional)</label>
-                <input type="text" name="ff_uid" value="<?php echo e($ff_uid); ?>"
-                       class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none transition-colors font-mono"
-                       placeholder="e.g. 1928392102">
-                <span class="text-[10px] text-zinc-400">Save your UID once to auto-fill every purchase.</span>
+                <label class="block text-zinc-300 font-semibold mb-1">Email Address *</label>
+                <input type="email" name="email" value="<?php echo e($email); ?>" required placeholder="e.g. gamer@example.com" class="w-full px-4 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-white text-xs focus:outline-none">
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Password</label>
-                    <input type="password" name="password" required
-                           class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none transition-colors"
-                           placeholder="••••••••">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Confirm Password</label>
-                    <input type="password" name="confirm_password" required
-                           class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none transition-colors"
-                           placeholder="••••••••">
-                </div>
+            <div>
+                <label class="block text-zinc-300 font-semibold mb-1">Free Fire UID (Optional, save for 1-click orders)</label>
+                <input type="text" name="ff_uid" value="<?php echo e($ff_uid); ?>" placeholder="e.g. 192837192" class="w-full px-4 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-white font-mono text-xs focus:outline-none">
             </div>
 
-            <button type="submit" class="w-full btn-gaming-red text-white font-gaming text-sm font-bold py-3 rounded-xl shadow-red-glow mt-2">
-                COMPLETE REGISTRATION &rarr;
+            <div>
+                <label class="block text-zinc-300 font-semibold mb-1">Password *</label>
+                <input type="password" name="password" required placeholder="Minimum 6 characters" class="w-full px-4 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-white text-xs focus:outline-none">
+            </div>
+
+            <div>
+                <label class="block text-zinc-300 font-semibold mb-1">Confirm Password *</label>
+                <input type="password" name="confirm_password" required placeholder="Repeat your password" class="w-full px-4 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-white text-xs focus:outline-none">
+            </div>
+
+            <button type="submit" class="w-full btn-gaming-red text-white font-gaming text-xs font-bold py-3 rounded-xl shadow-red-glow mt-4">
+                CREATE MY ACCOUNT
             </button>
         </form>
 
-        <div class="mt-6 text-center text-xs text-zinc-400 border-t border-gaming-border pt-4">
-            Already have a gaming account? 
-            <a href="/login.php" class="text-red-400 hover:text-red-300 font-semibold underline underline-offset-2">Log In Here</a>
+        <div class="mt-6 pt-4 border-t border-gaming-border text-center text-xs text-zinc-400">
+            Already have an account? 
+            <a href="/login.php" class="text-red-400 hover:text-red-300 font-semibold underline underline-offset-4 ml-1">
+                Log In Here
+            </a>
         </div>
     </div>
 </div>
