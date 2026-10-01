@@ -147,13 +147,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Selling Price ($) *</label>
+                    <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Selling Price (₹ INR) *</label>
                     <input type="number" step="0.01" min="0.1" name="price" value="<?php echo e($product['price']); ?>" required
                            class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Original Price ($)</label>
+                    <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Original Price (₹ INR)</label>
                     <input type="number" step="0.01" min="0" name="original_price" value="<?php echo e($product['original_price']); ?>"
                            class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none">
                 </div>

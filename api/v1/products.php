@@ -47,6 +47,6 @@ foreach ($products as $p) {
 echo json_encode([
     'status' => 'success',
     'total_products' => count($output),
-    'currency' => 'USD',
+    'currency' => defined('CURRENCY_CODE') ? CURRENCY_CODE : 'INR',
     'data' => $output
 ], JSON_PRETTY_PRINT);

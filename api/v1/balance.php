@@ -13,6 +13,6 @@ echo json_encode([
     'user_id' => (int)$auth_account['user_id'],
     'username' => $auth_account['username'],
     'wallet_balance' => $bal,
-    'currency' => 'USD',
+    'currency' => defined('CURRENCY_CODE') ? CURRENCY_CODE : 'INR',
     'reseller_level' => $auth_account['reseller_level'] ?: 'main'
 ], JSON_PRETTY_PRINT);

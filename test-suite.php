@@ -95,20 +95,20 @@ assert_test("Support ticket & admin reply thread ($msg_count messages)", $msg_co
 $admin = $pdo->query("SELECT * FROM admins WHERE username = 'admin'")->fetch();
 assert_test("Super Admin account exists in MySQL", !empty($admin));
 
-$pdo->prepare("UPDATE users SET wallet_balance = wallet_balance + 10.00 WHERE id = ?")->execute([$user_id]);
+$pdo->prepare("UPDATE users SET wallet_balance = wallet_balance + 100.00 WHERE id = ?")->execute([$user_id]);
 $final_balance = (float)$pdo->query("SELECT wallet_balance FROM users WHERE id = $user_id")->fetchColumn();
-assert_test("Admin manual wallet balance adjustment (+10.00)", $final_balance == ($new_balance + 10.00));
+assert_test("Admin manual wallet balance adjustment (+₹100.00)", $final_balance == ($new_balance + 100.00));
 
 // 10. Admin Product Creation, Edit & Delete
 $test_prod_name = "VIP Tournament Pass Pack";
 $test_slug = "vip-pass-" . mt_rand(100, 999);
-$pdo->prepare("INSERT INTO products (category_id, name, slug, description, image, price, status) VALUES (1, ?, ?, 'Test VIP product', '/assets/images/pass-weekly.svg', 15.99, 'active')")->execute([$test_prod_name, $test_slug]);
+$pdo->prepare("INSERT INTO products (category_id, name, slug, description, image, price, status) VALUES (1, ?, ?, 'Test VIP product', '/assets/images/pass-weekly.svg', 99.00, 'active')")->execute([$test_prod_name, $test_slug]);
 $new_p_id = $pdo->lastInsertId();
 assert_test("Admin product creation ($new_p_id)", $new_p_id > 0);
 
-$pdo->prepare("UPDATE products SET price = 12.99, badge = 'Sale' WHERE id = ?")->execute([$new_p_id]);
+$pdo->prepare("UPDATE products SET price = 79.00, badge = 'Sale' WHERE id = ?")->execute([$new_p_id]);
 $edited_price = (float)$pdo->query("SELECT price FROM products WHERE id = $new_p_id")->fetchColumn();
-assert_test("Admin product price edit ($12.99)", $edited_price == 12.99);
+assert_test("Admin product price edit (₹79.00)", $edited_price == 79.00);
 
 $pdo->prepare("DELETE FROM products WHERE id = ?")->execute([$new_p_id]);
 $deleted = $pdo->query("SELECT COUNT(*) FROM products WHERE id = $new_p_id")->fetchColumn();

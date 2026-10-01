@@ -10,8 +10,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $settings_to_update = [
         'site_name' => sanitize($_POST['site_name'] ?? 'FireZone Store'),
         'site_tagline' => sanitize($_POST['site_tagline'] ?? ''),
-        'currency_symbol' => sanitize($_POST['currency_symbol'] ?? '$'),
-        'currency_code' => sanitize($_POST['currency_code'] ?? 'USD'),
+        'currency_symbol' => '₹',
+        'currency_code' => 'INR',
         'site_status' => sanitize($_POST['site_status'] ?? 'online'),
         'support_email' => sanitize($_POST['support_email'] ?? ''),
         'support_whatsapp' => sanitize($_POST['support_whatsapp'] ?? ''),
@@ -36,8 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $site_name = get_setting('site_name', 'FireZone Store');
 $site_tagline = get_setting('site_tagline', 'Instant Free Fire Diamonds & Gaming Top-Ups');
-$currency_symbol = get_setting('currency_symbol', '$');
-$currency_code = get_setting('currency_code', 'USD');
+$currency_symbol = '₹';
+$currency_code = 'INR';
 $site_status = get_setting('site_status', 'online');
 $support_email = get_setting('support_email', 'support@firezonestore.com');
 $support_whatsapp = get_setting('support_whatsapp', '+1 555 374 8391');
@@ -86,9 +86,10 @@ $announcement = get_setting('announcement', '');
                                class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Currency Symbol</label>
-                        <input type="text" name="currency_symbol" value="<?php echo e($currency_symbol); ?>" required
-                               class="w-full px-3.5 py-2.5 rounded-xl bg-gaming-900 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none">
+                        <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Global Store Currency</label>
+                        <div class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gaming-900 border border-emerald-500/40 text-sm text-emerald-400 font-semibold">
+                            <span>₹ INR — Indian Rupee (Fixed)</span>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Store Online Status</label>

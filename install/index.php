@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_locked && $all_reqs_met) {
     $db_pass = (string)($_POST['db_pass'] ?? '');
 
     $site_name = trim($_POST['site_name'] ?? 'FireZone Store');
-    $currency = trim($_POST['currency_symbol'] ?? '$');
+    $currency = trim($_POST['currency_symbol'] ?? '₹');
 
     $admin_name = trim($_POST['admin_name'] ?? 'Administrator');
     $admin_user = trim($_POST['admin_user'] ?? 'admin');
@@ -258,8 +258,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_locked && $all_reqs_met) {
                                class="w-full px-3 py-2 rounded-lg bg-gaming-950 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-zinc-300 mb-1">Currency Symbol</label>
-                        <input type="text" name="currency_symbol" value="<?php echo htmlspecialchars($_POST['currency_symbol'] ?? '$'); ?>" required
+                        <label class="block text-xs font-medium text-zinc-300 mb-1">Currency Symbol (₹)</label>
+                        <input type="text" name="currency_symbol" value="<?php echo htmlspecialchars($_POST['currency_symbol'] ?? '₹'); ?>" required
                                class="w-full px-3 py-2 rounded-lg bg-gaming-950 border border-gaming-border focus:border-red-500 text-sm text-white focus:outline-none">
                     </div>
                 </div>

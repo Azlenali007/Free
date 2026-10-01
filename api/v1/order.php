@@ -94,7 +94,7 @@ try {
     // 3. Insert payment
     $stmt_p = $pdo->prepare("
         INSERT INTO payments (payment_id, user_id, wallet_transaction_id, gateway_code, amount, currency, status, gateway_txn_id) 
-        VALUES (?, ?, ?, 'reseller_api', ?, 'USD', 'completed', ?)
+        VALUES (?, ?, ?, 'reseller_api', ?, 'INR', 'completed', ?)
     ");
     $stmt_p->execute([$payment_id, $auth_account['user_id'], $w_row_id, $reseller_price, $wallet_txn_id]);
     $pay_row_id = $pdo->lastInsertId();
@@ -153,7 +153,7 @@ try {
         'diamonds_amount' => $diamonds_amount,
         'charged_amount' => $reseller_price,
         'remaining_balance' => $new_balance,
-        'currency' => 'USD'
+        'currency' => defined('CURRENCY_CODE') ? CURRENCY_CODE : 'INR'
     ], JSON_PRETTY_PRINT);
 
 } catch (Exception $e) {

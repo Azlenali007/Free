@@ -51,9 +51,35 @@ function update_setting($key, $value) {
     return true;
 }
 
-function format_currency($amount) {
-    $symbol = get_setting('currency_symbol', '$');
-    return $symbol . number_format((float)$amount, 2);
+// Central Global Currency Configuration - 100% INR
+if (!defined('CURRENCY_CODE')) {
+    define('CURRENCY_CODE', 'INR');
+}
+if (!defined('CURRENCY_SYMBOL')) {
+    define('CURRENCY_SYMBOL', '₹');
+}
+if (!defined('CURRENCY_NAME')) {
+    define('CURRENCY_NAME', 'Indian Rupee');
+}
+
+function get_currency_code() {
+    return CURRENCY_CODE;
+}
+
+function get_currency_symbol() {
+    return CURRENCY_SYMBOL;
+}
+
+function get_currency_name() {
+    return CURRENCY_NAME;
+}
+
+function format_currency($amount, $show_code = false) {
+    $formatted = CURRENCY_SYMBOL . number_format((float)$amount, 2);
+    if ($show_code) {
+        $formatted .= ' ' . CURRENCY_CODE;
+    }
+    return $formatted;
 }
 
 // CSRF Protection

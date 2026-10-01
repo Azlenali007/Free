@@ -86,8 +86,8 @@ $site_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : 
             <pre class="text-emerald-400">{
   "status": "success",
   "username": "reseller_pro",
-  "wallet_balance": 45.50,
-  "currency": "USD"
+  "wallet_balance": 4500.00,
+  "currency": "INR"
 }</pre>
         </div>
     </div>
@@ -125,8 +125,8 @@ $site_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : 
   "order_status": "processing",
   "ff_uid": "1928371928",
   "diamonds_amount": 110,
-  "charged_amount": 0.89,
-  "remaining_balance": 44.61
+  "charged_amount": 80.00,
+  "remaining_balance": 4420.00
 }</pre>
             </div>
         </div>

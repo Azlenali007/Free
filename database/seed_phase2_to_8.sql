@@ -2,12 +2,12 @@
 
 -- 1. Payment Gateways
 INSERT INTO `payment_gateways` (`code`, `name`, `title`, `instructions`, `currency`, `fee_percent`, `credentials`, `status`, `sort_order`) VALUES
-('wallet', 'Store Wallet', 'Pay using FireZone Wallet Balance', 'Instant 1-click checkout using your funded store balance.', 'USD', 0.00, '{"type":"internal"}', 'active', 1),
-('manual_deposit', 'Manual Bank / UPI / Crypto', 'Direct Bank Transfer / UPI / USDT', 'Send payment to our verified gaming account and provide Transaction Reference ID for swift admin processing.', 'USD', 0.00, '{"account_name":"FireZone Official","upi_id":"firezone@okaxis","usdt_trc20":"TN8x...92Z"}', 'active', 2),
-('stripe', 'Credit / Debit Card (Stripe)', 'Stripe Card Gateway', 'Pay securely using any International Visa, MasterCard, or Amex card.', 'USD', 2.50, '{"publishable_key":"pk_live_fz9823...","secret_key":"sk_live_fz8712..."}', 'active', 3),
-('razorpay', 'Razorpay UPI & NetBanking', 'Instant UPI / QR Code / NetBanking', 'Seamless payments via Google Pay, PhonePe, Paytm and NetBanking.', 'USD', 1.50, '{"key_id":"rzp_live_9812...","key_secret":"sec_8712..."}', 'active', 4),
-('mobile_wallet', 'bKash / Nagad / EasyPaisa', 'South Asia Mobile Financial Services', 'Instant mobile top-up verification via Personal/Merchant number.', 'USD', 0.00, '{"bkash":"+8801700000000","nagad":"+8801800000000"}', 'active', 5)
-ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
+('wallet', 'Store Wallet', 'Pay using FireZone Wallet Balance', 'Instant 1-click checkout using your funded store balance.', 'INR', 0.00, '{"type":"internal"}', 'active', 1),
+('manual_deposit', 'Manual Bank / UPI / Crypto', 'Direct Bank Transfer / UPI / USDT', 'Send payment to our verified gaming account and provide Transaction Reference ID for swift admin processing.', 'INR', 0.00, '{"account_name":"FireZone Official","upi_id":"firezone@okaxis","usdt_trc20":"TN8x...92Z"}', 'active', 2),
+('stripe', 'Credit / Debit Card (Stripe)', 'Stripe Card Gateway', 'Pay securely using any International Visa, MasterCard, or Amex card.', 'INR', 2.50, '{"publishable_key":"pk_live_fz9823...","secret_key":"sk_live_fz8712..."}', 'active', 3),
+('razorpay', 'Razorpay UPI & NetBanking', 'Instant UPI / QR Code / NetBanking', 'Seamless payments via Google Pay, PhonePe, Paytm and NetBanking.', 'INR', 1.50, '{"key_id":"rzp_live_9812...","key_secret":"sec_8712..."}', 'active', 4),
+('mobile_wallet', 'bKash / Nagad / EasyPaisa', 'South Asia Mobile Financial Services', 'Instant mobile top-up verification via Personal/Merchant number.', 'INR', 0.00, '{"bkash":"+8801700000000","nagad":"+8801800000000"}', 'active', 5)
+ON DUPLICATE KEY UPDATE `status` = VALUES(`status`), `currency` = VALUES(`currency`);
 
 -- 2. Banners for Homepage Slider
 INSERT INTO `banners` (`title`, `subtitle`, `description`, `badge`, `image`, `button_text`, `button_url`, `sort_order`, `status`) VALUES
@@ -18,9 +18,9 @@ ON DUPLICATE KEY UPDATE `title` = VALUES(`title`);
 
 -- 3. Coupons
 INSERT INTO `coupons` (`code`, `discount_type`, `discount_value`, `min_order_amount`, `max_discount`, `start_date`, `expiry_date`, `usage_limit`, `per_user_limit`, `status`) VALUES
-('FIRE10', 'percentage', 10.00, 2.00, 5.00, '2026-01-01 00:00:00', '2027-12-31 23:59:59', 1000, 3, 'active'),
-('WELCOME50', 'fixed', 0.50, 1.00, 0.50, '2026-01-01 00:00:00', '2027-12-31 23:59:59', 500, 1, 'active'),
-('DIAMOND20', 'percentage', 20.00, 10.00, 15.00, '2026-01-01 00:00:00', '2027-12-31 23:59:59', 200, 2, 'active')
+('FIRE10', 'percentage', 10.00, 100.00, 150.00, '2026-01-01 00:00:00', '2027-12-31 23:59:59', 1000, 3, 'active'),
+('WELCOME50', 'fixed', 50.00, 199.00, 50.00, '2026-01-01 00:00:00', '2027-12-31 23:59:59', 500, 1, 'active'),
+('DIAMOND20', 'percentage', 20.00, 499.00, 300.00, '2026-01-01 00:00:00', '2027-12-31 23:59:59', 200, 2, 'active')
 ON DUPLICATE KEY UPDATE `discount_value` = VALUES(`discount_value`);
 
 -- 4. Featured Products & Flash Sale setup on existing products

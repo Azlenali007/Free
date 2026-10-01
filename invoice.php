@@ -170,7 +170,7 @@ $support_phone = get_setting('support_whatsapp', '+1 555 374 8391');
                 <?php endif; ?>
                 <div class="flex items-center justify-between text-zinc-400 print:text-zinc-600">
                     <span>Delivery Fee:</span>
-                    <span class="font-mono text-emerald-400 print:text-black">FREE ($0.00)</span>
+                    <span class="font-mono text-emerald-400 print:text-black">FREE (₹0.00)</span>
                 </div>
                 <div class="flex items-center justify-between pt-2 border-t border-zinc-800 print-border text-sm font-bold">
                     <span class="text-white print:text-black">TOTAL PAID:</span>

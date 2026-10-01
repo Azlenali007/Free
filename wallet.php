@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt_pay = $pdo->prepare("
                     INSERT INTO payments 
                     (payment_id, user_id, wallet_transaction_id, gateway_code, amount, currency, status, gateway_txn_id, gateway_response) 
-                    VALUES (?, ?, ?, ?, ?, 'USD', 'completed', ?, ?)
+                    VALUES (?, ?, ?, ?, ?, 'INR', 'completed', ?, ?)
                 ");
                 $stmt_pay->execute([
                     $payment_id,
@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt_pay = $pdo->prepare("
                     INSERT INTO payments 
                     (payment_id, user_id, wallet_transaction_id, gateway_code, amount, currency, status, gateway_txn_id, gateway_response) 
-                    VALUES (?, ?, ?, ?, ?, 'USD', 'pending', ?, ?)
+                    VALUES (?, ?, ?, ?, ?, 'INR', 'pending', ?, ?)
                 ");
                 $stmt_pay->execute([
                     $payment_id,
@@ -365,14 +365,14 @@ require_once __DIR__ . '/includes/header.php';
             <?php echo csrf_field(); ?>
 
             <div>
-                <label class="block text-zinc-300 font-semibold mb-1">Select Deposit Amount (USD) *</label>
+                <label class="block text-zinc-300 font-semibold mb-1">Select Deposit Amount (₹ INR) *</label>
                 <div class="grid grid-cols-4 gap-2 mb-2">
-                    <button type="button" onclick="document.getElementById('depositAmt').value='5.00'" class="py-1.5 rounded-lg bg-gaming-850 hover:bg-gaming-800 text-white font-mono border border-gaming-border">$5.00</button>
-                    <button type="button" onclick="document.getElementById('depositAmt').value='10.00'" class="py-1.5 rounded-lg bg-gaming-850 hover:bg-gaming-800 text-white font-mono border border-gaming-border">$10.00</button>
-                    <button type="button" onclick="document.getElementById('depositAmt').value='25.00'" class="py-1.5 rounded-lg bg-gaming-850 hover:bg-gaming-800 text-white font-mono border border-gaming-border">$25.00</button>
-                    <button type="button" onclick="document.getElementById('depositAmt').value='50.00'" class="py-1.5 rounded-lg bg-gaming-850 hover:bg-gaming-800 text-white font-mono border border-gaming-border">$50.00</button>
+                    <button type="button" onclick="document.getElementById('depositAmt').value='100.00'" class="py-1.5 rounded-lg bg-gaming-850 hover:bg-gaming-800 text-white font-mono border border-gaming-border">₹100</button>
+                    <button type="button" onclick="document.getElementById('depositAmt').value='250.00'" class="py-1.5 rounded-lg bg-gaming-850 hover:bg-gaming-800 text-white font-mono border border-gaming-border">₹250</button>
+                    <button type="button" onclick="document.getElementById('depositAmt').value='500.00'" class="py-1.5 rounded-lg bg-gaming-850 hover:bg-gaming-800 text-white font-mono border border-gaming-border">₹500</button>
+                    <button type="button" onclick="document.getElementById('depositAmt').value='1000.00'" class="py-1.5 rounded-lg bg-gaming-850 hover:bg-gaming-800 text-white font-mono border border-gaming-border">₹1,000</button>
                 </div>
-                <input type="number" step="0.01" min="0.50" id="depositAmt" name="amount" required placeholder="Custom Amount (e.g. 15.00)" class="w-full px-4 py-2.5 rounded-xl bg-gaming-850 border border-gaming-border focus:border-red-500 text-white font-mono text-sm focus:outline-none">
+                <input type="number" step="1" min="10" id="depositAmt" name="amount" required placeholder="Custom Amount (e.g. 500)" class="w-full px-4 py-2.5 rounded-xl bg-gaming-850 border border-gaming-border focus:border-red-500 text-white font-mono text-sm focus:outline-none">
             </div>
 
             <div>
