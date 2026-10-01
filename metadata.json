@@ -1,0 +1,6 @@
+{
+  "name": "FireZone Store - Free Fire Top-Up & Gaming Panel",
+  "description": "Premium Black & Red gaming store and panel for Free Fire diamonds, top-ups, orders, wallet management, support tickets, and complete admin dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
